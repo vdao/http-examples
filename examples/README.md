@@ -170,7 +170,100 @@ $ curl -sk 'https://localhost:8443/ping' --key ./domain.key --cert ./domain.crt
 pong
 ```
 
+Теперь избавимся от необходимости передавать ключ -k
+
+```text
+-k, --insecure
+(TLS) By default, every SSL connection curl makes is verified to be secure. This option allows curl to proceed and operate even for server connections otherwise considered insecure.
+The server connection is verified by making sure the server's certificate contains the right name and verifies successfully using the cert store.
+See this online resource for further details:  https://curl.haxx.se/docs/sslcerts.html
+See also --proxy-insecure and --cacert. 
+```
+
+Для этого придется извлечь сертификат сервера. Сделать это можно несколькими способами, например, с помощью openssl:
+
+    $ openssl s_client -showcerts -connect localhost:8443 </dev/null 2>/dev/null \
+        | openssl x509 -outform PEM > server_cert.pem
+
+Теперь уберем ключ -k и добавим опцию --cacert
+
+```text
+$ curl 'https://localhost:8443/ping' --key ./domain.key --cert ./domain.crt --cacert ./server_cert.pem
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+curl: (51) SSL: certificate subject name 'user@example.com' does not match target host name 'localhost'
+```
+
+Иногда можно решить проблему при помощи --resolve, но не в случае email в качестве CN
+
+```text
+$ curl 'https://example.com:8443/ping' --key ./domain.key --cert ./domain.crt --cacert ./server_cert.pem --resolve example.com:8443:127.0.0.1
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+curl: (51) SSL: certificate subject name 'user@example.com' does not match target host name 'example.com'
+
+```
+
 Теперь попробуем выполнить тот же запрос из java-клиента. На время отладки включим опцию:
 ```text
 -Djavax.net.debug=all
 ```
+
+История TLS. [Transport Level Security (TLS) and Java](http://www.ateam-oracle.com/tls-and-java/)
+```text
+SSL 1.0 — никогда не публиковался
+SSL 2.0 — февраль 1995 года
+SSL 3.0 — 1996 год
+TLS 1.0 — январь 1999 года
+TLS 1.1 — апрель 2006 года
+TLS 1.2 — август 2008 года
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 2. Рецепты
+
+Просмотреть SSL сертификат удаленного сервера
+
+    openssl s_client -connect {HOSTNAME}:{PORT} -showcerts
+    
+    openssl s_client -showcerts -connect server.edu:443 </dev/null 2>/dev/null|openssl x509 -outform PEM >mycertfile.pem
+    
+Использование сертификата сервера с утилитой wget
+
+    wget https:/server.edu:443/somepage --ca-certificate=mycertfile.pem
+
+Использование сертификата сервера с утилитой curl
+
+    $ curl -k 'https://localhost:8443/ping' --key ./domain.key --cert ./domain.crt --cacert=mycertfile.pem
+    
+Экспортировать ключ в формате pem из кейстора
+
+    $ keytool -importkeystore -srckeystore keystore.jks -destkeystore keystore.p12 
+    -deststoretype PKCS12 -srcalias <jkskeyalias> -deststorepass <password>
+    -destkeypass <password>
+    
+Извлечь открытый ключ с помощью openssl:
+    
+    openssl pkcs12 -in keystore.p12  -nokeys -out cert.pem
+    
+Извлечь незашифрованный приватный ключ из кейстора:
+    
+    openssl pkcs12 -in keystore.p12  -nodes -nocerts -out key.pem
+
+
+keytool -importkeystore -srckeystore keystore.jks -destkeystore keystore.p12 -deststoretype PKCS12 -srcalias my_cert -deststorepass qwerty -destkeypass qwerty
