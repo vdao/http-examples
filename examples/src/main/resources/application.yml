@@ -1,0 +1,10 @@
+server:
+  port: 8443
+  ssl:
+    key-store: classpath:keystore.jks
+    key-store-password: qwerty
+    key-password: qwerty
+    trust-store: classpath:truststore.jks
+    trust-store-password: qwerty
+    protocol: TLS
+    client-auth: need
